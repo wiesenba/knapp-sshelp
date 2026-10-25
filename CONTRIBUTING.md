@@ -6,6 +6,7 @@ Keep SSHELP standalone, small and safe to publish. Contributions use the MIT lic
 
 - Keep runtime Python modules flat under [app/](app/), using only the Python standard library. Target Linux, Ubuntu 24.04+ and WSL2; require Python 3.10+ and fzf 0.44+.
 - Keep [install.sh](install.sh) as the shell entry point to [tools/install.py](tools/install.py). Install as a normal Linux user and refuse unmanaged conflicts. Preserve managed-marker checks and bounded shell blocks.
+- Keep `--isolated` preview application/config/state separate, with no migration, wizard, key/agent setup or shell changes. Preview upgrades/backups and uninstall must leave normal managed or custom copies untouched; preserve preview config/state on uninstall. `--no-shell` is not isolation. See [README.md](README.md#existing-custom-installation--isolated-preview).
 - Do not change WSL networking, Windows settings, VPN configuration, global SSH defaults, keys or existing host entries. Keep setup and host edits explicit and reviewed. Do not invent X11, agent or port forwards.
 - Preserve working inherited agent sockets. Never auto-load a key, capture a passphrase or add telemetry.
 - Network preview must start off for new state, remain focused/visible-only, use direct ICMP/TCP without login, and cancel helpers reliably. Static commands must not introduce probes. Document the `ssh -G` / user-authored `Match exec` caveat.

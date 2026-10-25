@@ -43,6 +43,10 @@ def yes(prompt: str) -> bool:
 
 
 def setup() -> int:
+    if os.environ.get('SSHELP_ISOLATED') == '1':
+        print('Isolated preview: personal keys, agents and shell startup files are not configured.')
+        print('Use sshelp-preview -a for separate preview aliases, then sshelp-preview to open it.')
+        return 0
     if not sys.stdin.isatty() or not sys.stdout.isatty():
         print('Open an interactive Ubuntu/WSL terminal and run sshelp --setup.', file=sys.stderr)
         return 1

@@ -26,7 +26,7 @@ from state import Store
 from themes import NAMES as THEME_NAMES, PALETTES, compact, fzf_colors, pointer
 from network import Probe, network_lines, DEBOUNCE, REFRESH, FRAME_INTERVAL, valid_destination
 
-VERSION = "2.2.0"
+VERSION = "2.2.1"
 APP = Path(__file__).resolve()
 
 
@@ -34,7 +34,8 @@ class Context:
     def __init__(self):
         self.home = Path.home()
         self.config = Path(os.environ.get("SSHELP_CONFIG", str(self.home / ".ssh/config"))).expanduser().absolute()
-        self.directory = Path(os.environ.get("XDG_STATE_HOME", str(self.home / ".local/state"))) / "sshelp"
+        default_state = Path(os.environ.get("XDG_STATE_HOME", str(self.home / ".local/state"))) / "sshelp"
+        self.directory = Path(os.environ.get("SSHELP_STATE_DIR", str(default_state))).expanduser().absolute()
         self.color = "NO_COLOR" not in os.environ and os.environ.get("SSHELP_COLOR") != "0"
         self.store = Store(self.directory)
         self.theme = self.store.preference("theme", "minimal")
@@ -452,7 +453,8 @@ def plain_menu(ctx: Context, settings: dict, query: str) -> int:
 
 def dashboard(ctx: Context, settings: dict, query: str) -> int:
     if not ctx.catalog.hosts:
-        print("No literal host aliases found. Add one with sshelp -a.")
+        command = 'sshelp-preview' if os.environ.get('SSHELP_ISOLATED') == '1' else 'sshelp'
+        print(f"No literal host aliases found. Add one with {command} -a.")
         return 0
     with tempfile.TemporaryDirectory(prefix="session-", dir=ctx.directory) as temporary:
         path = Path(temporary) / "view.json"

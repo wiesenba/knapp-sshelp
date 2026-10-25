@@ -22,12 +22,24 @@ MARKER = {'application': 'sshelp', 'format': 1}
 WRAPPER_MARKER = '# sshelp-managed-launcher'
 
 
-def paths():
+def paths(isolated: bool = False):
     home = Path.home()
     data = Path(os.environ.get('XDG_DATA_HOME', str(home / '.local/share')))
     if not data.is_absolute():
         raise ValueError('XDG_DATA_HOME must be an absolute path.')
-    return home, data / 'sshelp', home / '.local/bin/sshelp'
+    name = 'sshelp-preview' if isolated else 'sshelp'
+    return home, data / name, home / '.local/bin' / name
+
+
+def isolated_paths(home: Path) -> tuple[Path, Path]:
+    config = Path(os.environ.get('XDG_CONFIG_HOME', str(home / '.config'))) / 'sshelp-preview/config'
+    state = Path(os.environ.get('XDG_STATE_HOME', str(home / '.local/state'))) / 'sshelp-preview'
+    if not config.is_absolute() or not state.is_absolute():
+        raise ValueError('XDG_CONFIG_HOME and XDG_STATE_HOME must be absolute paths.')
+    for path in (config, config.parent, state):
+        if path.is_symlink():
+            raise ValueError('Refusing a symbolic link for isolated configuration or state.')
+    return config, state
 
 
 def owned(target: Path) -> bool:
@@ -54,8 +66,9 @@ def check_version() -> None:
         raise ValueError('fzf 0.44+ is required. Ubuntu 24.04+ provides a compatible version.')
 
 
-def uninstall(no_shell: bool = False) -> int:
-    home, target, wrapper = paths()
+def uninstall(no_shell: bool = False, isolated: bool = False) -> int:
+    home, target, wrapper = paths(isolated)
+    no_shell = no_shell or isolated
     if not owned(target):
         raise ValueError('No managed installation found. Nothing was removed.')
     if wrapper.is_symlink() or (wrapper.exists() and WRAPPER_MARKER not in wrapper.read_text()):
@@ -67,17 +80,19 @@ def uninstall(no_shell: bool = False) -> int:
     if wrapper.exists():
         wrapper.unlink()
     shutil.rmtree(target)
-    print('Removed the managed application and shell blocks.')
+    print('Removed the isolated preview application.' if isolated else 'Removed the managed application and shell blocks.')
     print('Your SSH config, keys, agent process, preferences, history and backups were preserved.')
-    print('Private state remains under ${XDG_STATE_HOME:-~/.local/state}/sshelp. Review it manually if no longer needed.')
+    print('Preview config/state were preserved.' if isolated else 'Private state remains under ${XDG_STATE_HOME:-~/.local/state}/sshelp. Review it manually if no longer needed.')
     return 0
 
 
-def install(no_setup: bool, no_shell: bool) -> int:
+def install(no_setup: bool, no_shell: bool, isolated: bool = False) -> int:
     check_version()
-    home, target, wrapper = paths()
+    home, target, wrapper = paths(isolated)
+    no_shell = no_shell or isolated
+    config, state = isolated_paths(home) if isolated else (None, None)
     if target.is_symlink() or (target.exists() and not owned(target)):
-        raise ValueError('An unmanaged application already occupies the install directory. It will not be overwritten.')
+        raise ValueError('An unmanaged application already occupies the install directory. It will not be overwritten. Use bash install.sh --isolated to test a separate sshelp-preview installation.')
     if wrapper.is_symlink() or (wrapper.exists() and WRAPPER_MARKER not in wrapper.read_text()):
         raise ValueError('An existing unmanaged sshelp command will not be overwritten.')
     for name in FILES:
@@ -100,9 +115,9 @@ def install(no_setup: bool, no_shell: bool) -> int:
             os.chmod(temporary / name, 0o600)
         (temporary / 'installation.json').write_text(json.dumps(MARKER) + '\n')
         if target.exists():
-            state = Path(os.environ.get('XDG_STATE_HOME', str(home / '.local/state'))) / 'sshelp/install-backups'
-            state.mkdir(mode=0o700, parents=True, exist_ok=True)
-            backup = state / ('app-' + str(time.time_ns()))
+            backup_directory = (state if isolated else Path(os.environ.get('XDG_STATE_HOME', str(home / '.local/state'))) / 'sshelp') / 'install-backups'
+            backup_directory.mkdir(mode=0o700, parents=True, exist_ok=True)
+            backup = backup_directory / ('app-' + str(time.time_ns()))
             target.rename(backup)
         try:
             temporary.rename(target)
@@ -113,7 +128,15 @@ def install(no_setup: bool, no_shell: bool) -> int:
         fd, wrapper_temp = tempfile.mkstemp(prefix='.sshelp-', dir=wrapper.parent)
         try:
             with os.fdopen(fd, 'w') as stream:
-                stream.write('#!/usr/bin/env bash\n' + WRAPPER_MARKER + '\nexec python3 ' + shlex.quote(str(target / 'app.py')) + ' "$@"\n')
+                stream.write('#!/usr/bin/env bash\n' + WRAPPER_MARKER + '\n')
+                if isolated:
+                    config.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+                    if not config.exists():
+                        with config.open('x', encoding='utf-8') as config_file:
+                            config_file.write('# Isolated SSHELP preview aliases. No personal inventory is imported.\n')
+                        os.chmod(config, 0o600)
+                    stream.write('export SSHELP_ISOLATED=1\nexport SSHELP_CONFIG=' + shlex.quote(str(config)) + '\nexport SSHELP_STATE_DIR=' + shlex.quote(str(state)) + '\n')
+                stream.write('exec python3 ' + shlex.quote(str(target / 'app.py')) + ' "$@"\n')
             os.chmod(wrapper_temp, 0o700)
             os.replace(wrapper_temp, wrapper)
         finally:
@@ -125,6 +148,12 @@ def install(no_setup: bool, no_shell: bool) -> int:
     finally:
         if temporary.exists():
             shutil.rmtree(temporary)
+    if isolated:
+        print('Installed isolated sshelp-preview. Existing application, hosts, state, keys and shell files were not changed.')
+        print('Run: ~/.local/bin/sshelp-preview')
+        print('Add separate preview hosts: ~/.local/bin/sshelp-preview -a')
+        print('Remove preview application: bash uninstall.sh --isolated')
+        return 0
     print('SSHELP installed for your Linux user. No SSH or network settings were changed.')
     print('Close and reopen Ubuntu, then run: sshelp --setup')
     print('You can also start immediately with: ~/.local/bin/sshelp --setup')
@@ -138,12 +167,13 @@ def main() -> int:
     parser.add_argument('--no-setup', action='store_true')
     parser.add_argument('--no-shell', action='store_true')
     parser.add_argument('--uninstall', action='store_true')
+    parser.add_argument('--isolated', action='store_true', help='install/remove sshelp-preview with separate config/state and no shell/key setup')
     args = parser.parse_args()
     os.umask(0o077)
     try:
         if os.geteuid() == 0:
             raise ValueError('Install/uninstall as your normal Linux user, not root.')
-        return uninstall(args.no_shell) if args.uninstall else install(args.no_setup, args.no_shell)
+        return uninstall(args.no_shell, args.isolated) if args.uninstall else install(args.no_setup, args.no_shell, args.isolated)
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         print(f'sshelp installer: {error}', file=sys.stderr)
         return 1

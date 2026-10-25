@@ -8,9 +8,9 @@ args=()
 for arg in "$@"; do
     case "$arg" in
         --install-deps) deps=1 ;;
-        --no-setup|--no-shell) args+=("$arg") ;;
+        --no-setup|--no-shell|--isolated) args+=("$arg") ;;
         -h|--help)
-            printf 'Usage: bash install.sh [--install-deps] [--no-setup] [--no-shell]\n'
+            printf 'Usage: bash install.sh [--install-deps] [--no-setup] [--no-shell] [--isolated]\n'
             printf 'Dependencies: Python 3.10+, OpenSSH, fzf 0.44+. Ubuntu 24.04+ recommended.\n'
             exit 0 ;;
         *) printf 'Unknown option: %s\n' "$arg" >&2; exit 2 ;;

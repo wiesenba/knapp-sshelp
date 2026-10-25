@@ -1,4 +1,4 @@
-# SSHELP 2.2.0
+# SSHELP 2.2.1
 
 A standalone terminal dashboard for your own SSH aliases. Search hosts and projects, keep favourites and recents, and connect using OpenSSH. The application uses the Python standard library; no Python packages or account registration are required.
 
@@ -30,12 +30,27 @@ Installer options:
 | `--install-deps` | Explicitly authorize `sudo apt-get update` and dependency installation on an apt-based distribution. |
 | `--no-setup` | Skip the interactive first-run wizard. |
 | `--no-shell` | Do not add PATH blocks to shell startup files; configure your PATH yourself. |
+| `--isolated` | Install a separate `sshelp-preview` with empty config, private state and no wizard or shell/key/agent setup. |
 
 Options can be combined. Without shell changes, the installed command can be invoked as `~/.local/bin/sshelp`. An outdated fzf must be upgraded to 0.44+; merely having an older executable is insufficient.
 
 The installer manages `${XDG_DATA_HOME:-~/.local/share}/sshelp` and the wrapper `~/.local/bin/sshelp`. It refuses unmanaged conflicts rather than replacing them. Unless `--no-shell` is used, it adds bounded PATH blocks to `~/.bashrc` and `~/.profile`. Reopen the terminal after installation. Reinstalling updates a managed application and keeps a private backup of its previous files.
 
 It does **not** change WSL networking, Windows settings, VPN configuration, global SSH defaults, keys or existing host entries. The optional setup and add-host actions below make only their stated, user-approved changes.
+
+### Existing custom installation / isolated preview
+
+**“An unmanaged application already occupies the install directory”** means an existing pre-installer or custom copy is protected, not that a fresh installation is broken. Do not delete that copy or fabricate an installation marker. There is no automatic migration. Plain `--no-shell` still uses the normal application target and does **not** resolve this conflict.
+
+From the extracted folder, run `bash install.sh --isolated`, then launch **`~/.local/bin/sshelp-preview`** explicitly. Normal `sshelp` and any existing shell alias/function stay unchanged. The preview starts with **no hosts**, even if your normal SSH config has aliases; use `~/.local/bin/sshelp-preview -a` to add separate preview entries. Its `--setup` deliberately skips personal key, agent and startup configuration.
+
+Preview locations (all private, outside this repository):
+
+- Application: `${XDG_DATA_HOME:-~/.local/share}/sshelp-preview`; launcher: `~/.local/bin/sshelp-preview`.
+- Empty separate config: `${XDG_CONFIG_HOME:-~/.config}/sshelp-preview/config`.
+- Preferences, history and preview-only upgrade backups: `${XDG_STATE_HOME:-~/.local/state}/sshelp-preview`. The launcher explicitly sets `SSHELP_CONFIG`, `SSHELP_STATE_DIR` and `SSHELP_ISOLATED=1`.
+
+Update the preview with **`bash install.sh --isolated`** again; keep the flag on every update. Remove only its application and launcher with **`bash uninstall.sh --isolated`**. Preview config/state/backups remain private for reuse; the original application, hosts, state and shell blocks are preserved.
 
 ## Set up your own hosts
 
@@ -90,6 +105,6 @@ See [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md) and the isola
 
 ### Validation baseline
 
-Validated on Ubuntu 24.04 / WSL2 with Python 3.12 and fzf 0.44.1: **95 unit tests**, real terminal checks for all themes and monochrome, loopback-only preview checks, and actual shell install/uninstall in temporary homes. Tests use only synthetic configuration and never test a user's real servers. The Windows launcher was syntax-checked; a fresh Windows/WSL installation and privileged dependency installation were not executed as part of this validation.
+Validated on Ubuntu 24.04 / WSL2 with Python 3.12 and fzf 0.44.1: **112 unit tests**, real terminal checks for all themes and monochrome, loopback-only preview checks, and actual shell install/upgrade/uninstall in temporary homes. Isolated-preview tests verify that original applications, hosts, keys, preferences and shell blocks are preserved. Tests use only synthetic configuration and never test a user's real servers. The Windows launcher was syntax-checked; a fresh Windows/WSL installation and privileged dependency installation were not executed as part of this validation.
 
 MIT licensed; see [LICENSE](LICENSE). Copyright (c) 2026 SSHELP contributors.

@@ -13,7 +13,7 @@ from pathlib import Path
 sys.dont_write_bytecode = True
 from check_release import ROOT, FILES, audit, inspect_text, private_terms
 
-VERSION = '2.2.0'
+VERSION = '2.2.1'
 
 
 def build(root: Path, output: Path, deny_terms=()) -> tuple[Path, str]:

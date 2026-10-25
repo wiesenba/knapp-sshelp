@@ -18,10 +18,12 @@ class SetupTests(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.home = Path(self.temporary.name)
-        self.environment = patch.dict(os.environ, {'HOME': str(self.home)})
+        self.environment = patch.dict(os.environ, {
+            'HOME': str(self.home), 'XDG_CONFIG_HOME': str(self.home / 'config'),
+            'XDG_DATA_HOME': str(self.home / 'data'), 'XDG_STATE_HOME': str(self.home / 'state'),
+            'PATH': os.defpath, 'PYTHONDONTWRITEBYTECODE': '1',
+        }, clear=True)
         self.environment.start()
-        for key in ('SSHELP_CONFIG', 'SSH_AUTH_SOCK'):
-            os.environ.pop(key, None)
 
     def tearDown(self):
         self.environment.stop()
@@ -75,6 +77,30 @@ class SetupTests(unittest.TestCase):
         with patch.object(sys.stdin, 'isatty', return_value=False), contextlib.redirect_stderr(io.StringIO()):
             self.assertEqual(onboarding.setup(), 1)
         self.assertFalse((self.home / '.ssh').exists())
+
+    def assert_isolated_setup_skips_every_side_effect(self):
+        before = {path.relative_to(self.home): path.read_bytes()
+                  for path in self.home.rglob('*') if path.is_file()}
+        with patch.dict(os.environ, {'SSHELP_ISOLATED': '1'}), contextlib.redirect_stdout(io.StringIO()) as output:
+            with patch.object(sys.stdin, 'isatty', return_value=True), patch.object(output, 'isatty', return_value=True), patch.object(onboarding, 'yes') as ask, patch.object(onboarding.subprocess, 'call') as call, patch.object(onboarding, 'shell_block') as shell, patch.object(onboarding, 'private_directory') as directory:
+                self.assertEqual(onboarding.setup(), 0)
+        ask.assert_not_called()
+        call.assert_not_called()
+        shell.assert_not_called()
+        directory.assert_not_called()
+        self.assertIn('Isolated preview', output.getvalue())
+        self.assertEqual(before, {path.relative_to(self.home): path.read_bytes()
+                                  for path in self.home.rglob('*') if path.is_file()})
+
+    def test_isolated_setup_does_not_create_config_keys_or_startup_files(self):
+        self.assert_isolated_setup_skips_every_side_effect()
+        self.assertEqual(list(self.home.iterdir()), [])
+
+    def test_isolated_setup_preserves_existing_config_keys_and_shell_files(self):
+        (self.home / '.ssh').mkdir()
+        for name in ('.ssh/config', '.ssh/id_ed25519', '.ssh/id_ed25519.pub', '.bashrc', '.profile'):
+            (self.home / name).write_bytes(b'untouched synthetic fixture\x00\xff')
+        self.assert_isolated_setup_skips_every_side_effect()
 
     def test_shell_blocks_do_not_duplicate(self):
         path = self.home / '.bashrc'

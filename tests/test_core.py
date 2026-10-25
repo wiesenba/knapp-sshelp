@@ -48,7 +48,10 @@ class Fixture(unittest.TestCase):
         self.env = patch.dict(os.environ, {
             "HOME": str(self.home), "XDG_STATE_HOME": str(self.home / "state"),
             "SSHELP_CONFIG": str(self.config), "NO_COLOR": "1",
-        })
+            "XDG_CONFIG_HOME": str(self.home / "config"),
+            "XDG_DATA_HOME": str(self.home / "data"),
+            "PATH": os.defpath, "PYTHONDONTWRITEBYTECODE": "1",
+        }, clear=True)
         self.env.start()
         self.ctx = app.Context()
 
@@ -159,8 +162,49 @@ class StateTests(Fixture):
         with self.assertRaises(ValueError):
             Store(directory)
 
+    def test_state_directory_override_keeps_normal_preferences_unchanged(self):
+        self.ctx.store.set_preference("theme", "midnight")
+        before = self.ctx.store.path.read_bytes()
+        directory = self.home / "state/sshelp-preview"
+        with patch.dict(os.environ, {"SSHELP_STATE_DIR": str(directory)}):
+            other = app.Context()
+            try:
+                self.assertEqual(other.directory, directory)
+                self.assertEqual(other.theme, "minimal")
+                other.store.set_preference("theme", "ember")
+                other.store.toggle("Demo-Dev")
+            finally:
+                other.store.close()
+            result = subprocess.run([sys.executable, str(ROOT / "app.py"), "--no-network", "--list"],
+                                    capture_output=True, text=True, timeout=10)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            other = app.Context()
+            try:
+                self.assertEqual(other.theme, "ember")
+                self.assertFalse(other.network)
+                self.assertTrue(other.store.metadata()["demo-dev"]["favourite"])
+            finally:
+                other.store.close()
+        self.assertEqual(self.ctx.store.path.read_bytes(), before)
+        self.assertEqual(self.ctx.store.metadata(), {})
+
+    def test_state_directory_override_expands_temporary_home(self):
+        with patch.dict(os.environ, {"SSHELP_STATE_DIR": "~/.preview-state"}):
+            other = app.Context()
+            try:
+                self.assertEqual(other.directory, self.home / ".preview-state")
+                self.assertEqual(other.store.path.parent, other.directory)
+            finally:
+                other.store.close()
+
 
 class InterfaceTests(Fixture):
+    def test_empty_isolated_dashboard_recommends_preview_command(self):
+        self.ctx.catalog.hosts.clear()
+        with patch.dict(os.environ, {'SSHELP_ISOLATED': '1'}), contextlib.redirect_stdout(io.StringIO()) as output:
+            self.assertEqual(app.dashboard(self.ctx, {}, ''), 0)
+        self.assertIn('sshelp-preview -a', output.getvalue())
+
     def test_minimal_is_default_theme(self):
         self.assertEqual(self.ctx.theme, "minimal")
 
@@ -359,7 +403,7 @@ class InterfaceTests(Fixture):
         with patch.dict(os.environ, {"XDG_STATE_HOME": str(self.home / "unused")}):
             p = subprocess.run([sys.executable, str(ROOT / "app.py"), "--version"], capture_output=True, text=True)
         self.assertEqual(p.returncode, 0, p.stderr)
-        self.assertEqual(p.stdout.strip(), "sshelp 2.2.0")
+        self.assertEqual(p.stdout.strip(), "sshelp 2.2.1")
         self.assertFalse((self.home / "unused").exists())
 
     def test_missing_config_suggests_setup(self):

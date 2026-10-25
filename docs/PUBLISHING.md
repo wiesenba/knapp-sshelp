@@ -1,4 +1,4 @@
-# Publishing SSHELP 2.2.0 safely
+# Publishing SSHELP 2.2.1 safely
 
 This is a **manual** checklist for an existing empty GitHub repository. No SSHELP script initializes Git, pushes commits, creates releases or uploads files. Work only in this isolated SSHELP folder, never in its parent or your home directory. Do not point a Git client at a broader folder.
 
@@ -7,7 +7,7 @@ This is a **manual** checklist for an existing empty GitHub repository. No SSHEL
 - Confirm that the folder contains only public SSHELP source, generic fixtures, tests, tooling, documentation and workflow configuration. Check hidden files too. Do not copy from a live installation, SSH directory, backup or actual inventory.
 - Read every proposed public file, including comments, examples, scripts, test fixtures and this documentation. Permit only the approved synthetic aliases, project codes and addresses described in [../CONTRIBUTING.md](../CONTRIBUTING.md).
 - Do not add company names, real people/account names, personal paths, internal identifiers, actual hostnames/inventory, keys, SSH config, secrets, state, databases, backups, screenshots, recordings, images or logs. Keep private configuration outside this checkout.
-- Verify version 2.2.0, the MIT license in [../LICENSE](../LICENSE), and exactly `Copyright (c) 2026 SSHELP contributors`. Do not add organizational code attribution.
+- Verify version 2.2.1, the MIT license in [../LICENSE](../LICENSE), and exactly `Copyright (c) 2026 SSHELP contributors`. Do not add organizational code attribution.
 - Review [../.gitignore](../.gitignore), but do not treat it as a privacy guarantee: ignored files can already be tracked or force-added, and an archive tool can ignore Git rules entirely.
 
 ## 2. Require all release tooling
@@ -38,6 +38,8 @@ Python 3.12 matches [../.github/workflows/check.yml](../.github/workflows/check.
 Use your private `--deny-term TEXT` or comma-separated `SSHELP_AUDIT_FORBIDDEN` checks in addition to the public audit. They are extra checks, not substitutions for manual review. **No automated audit proves the absence of every sensitive datum.** Stop on every failure and inspect audit output locally before quoting any of it.
 
 Do not run the real installer merely to validate a release. Installer tests should use temporary homes and mocks. Do not exercise a real host, config, key or agent as a release test.
+
+Version 2.2.1 regression checks must cover isolated install/upgrade/uninstall, an empty separate catalogue, independent preferences, config/state symlink refusal, and unchanged managed/unmanaged original copies and shell blocks. An “unmanaged application” is a protected pre-installer/custom copy, not a fresh-install bug: do not delete it or fake a marker. See the [isolated-preview guide](../README.md#existing-custom-installation--isolated-preview); `--no-shell` still shares the normal target. Preview updates/removal require `--isolated`, and private config/state remain outside the repository. Release tests exercise this only in temporary homes.
 
 ## 4. Review the generated artifact
 
