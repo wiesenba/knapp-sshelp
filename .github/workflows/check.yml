@@ -1,0 +1,50 @@
+name: Check public release
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PYTHONDONTWRITEBYTECODE: '1'
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out public source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y openssh-client fzf iputils-ping
+
+      - name: Check shell syntax
+        run: bash -n install.sh uninstall.sh app/agent.sh
+
+      - name: Run isolated unit tests
+        run: python3 -m unittest discover -s tests -p 'test_*.py' -v
+
+      - name: Run UI smoke tests
+        run: python3 tests/ui_smoke.py
+
+      - name: Run loopback network smoke tests
+        run: python3 tests/network_smoke.py
+
+      - name: Audit public release files
+        run: python3 tools/check_release.py
+
+      - name: Build audited reproducible release
+        run: python3 tools/build_release.py --output-dir ../sshelp-release

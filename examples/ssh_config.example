@@ -1,0 +1,27 @@
+# Documentation-only placeholders. Never put your real inventory in this repo.
+# Use `sshelp -a` to add YOUR hosts to ~/.ssh/config, outside this checkout.
+# The addresses below are reserved for documentation and are not real servers.
+
+## EX00001 - Demo - Dev
+Host Demo-Dev
+    HostName 192.0.2.10
+    User demo
+    Port 22
+    ConnectTimeout 10
+    ServerAliveInterval 15
+    ServerAliveCountMax 3
+    ForwardX11 no
+    ForwardAgent no
+    StrictHostKeyChecking ask
+
+## EX00001 - Demo - Live
+Host Demo-Live
+    HostName 192.0.2.11
+    User demo
+    Port 22
+
+## EX00002 - Lab - Sbx
+Host Lab-Sbx
+    HostName 198.51.100.20
+    User demo
+    Port 22
